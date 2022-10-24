@@ -1,17 +1,19 @@
-const { Client, GatewayIntentBits, Routes } = require('discord.js');
-const { token, prefix, clientId, ownerId } = require('./config.json');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource} = require('@discordjs/voice');
+const {Client, GatewayIntentBits, Routes} = require('discord.js');
+const {token, prefix, clientId, ownerId} = require('./config.json');
+const {joinVoiceChannel, createAudioPlayer, createAudioResource} = require('@discordjs/voice');
 const play = require('play-dl');
 const {REST} = require("@discordjs/rest")
 
 // Create a new client instance
-const client = new Client({ intents: [
+const client = new Client({
+    intents: [
         GatewayIntentBits.GuildMessages,
-         GatewayIntentBits.Guilds,
+        GatewayIntentBits.Guilds,
         GatewayIntentBits.MessageContent,
         641,
 
-    ] });
+    ]
+});
 
 
 // When the client is ready, run this code (only once)
@@ -19,10 +21,10 @@ client.once('ready', () => {
     console.log('Ready!');
 });
 
-let connection;
+let connection = {};
 
 
-const rest = new REST({ version: '10' }).setToken(token)
+const rest = new REST({version: '10'}).setToken(token)
 
 const commands = [
     {
@@ -43,7 +45,7 @@ const commands = [
     try {
         console.log('Started refreshing application (/) commands.');
 
-        await rest.put(Routes.applicationCommands(clientId), { body: commands });
+        await rest.put(Routes.applicationCommands(clientId), {body: commands});
 
         console.log('Successfully reloaded application (/) commands.');
     } catch (error) {
@@ -60,11 +62,10 @@ client.on('interactionCreate', async interaction => {
         // Getting the author's voice connection.
         const userVoiceChannel = interaction.member.voice;
 
-        if (!userVoiceChannel.channel){
+        if (!userVoiceChannel.channel) {
             await interaction.reply("You need to be in a voice channel lol");
             return
         }
-
 
 
         await joinAndPlay(userVoiceChannel.channelId, interaction.guild)
@@ -78,18 +79,17 @@ client.on('interactionCreate', async interaction => {
 });
 
 
+client.on('voiceStateUpdate', async (old, news,) => {
 
-client.on('voiceStateUpdate',  async (old,news,) => {
-
-    if (old ){
-        if(old.channel){
-            if (old.channel.members.size !== 0){
-                if (old.channel.members.size === 1){
+    if (old) {
+        if (old.channel) {
+            if (old.channel.members.size !== 0) {
+                if (old.channel.members.size === 1) {
                     for (const [memberID, member] of old.channel.members) {
-                        if (memberID === clientId){
-                            if (!connection) return
-                            connection.destroy()
-                            connection = null
+                        if (memberID === clientId) {
+                            if (!connection[old.guild.id]) return
+                            connection[old.guild.id].destroy()
+                            connection[old.guild.id] = null
                         }
                     }
                 }
@@ -110,7 +110,7 @@ client.on('voiceStateUpdate',  async (old,news,) => {
 
     if (news.channelId === null) return
 
-    if (news.member.id === ownerId && old.member.id === ownerId){
+    if (news.member.id === ownerId && old.member.id === ownerId) {
 
         await joinAndPlay(news.channelId, news.guild)
 
@@ -120,13 +120,12 @@ client.on('voiceStateUpdate',  async (old,news,) => {
 
 
 client.on('messageCreate', async (message) => {
-    if (message.content === prefix+"join"){
+    if (message.content === prefix + "join") {
 
         // Getting the author's voice connection.
         const userVoiceChannel = message.member.voice;
 
         if (!userVoiceChannel.channel) await message.reply("You need to be in a voice channel lol");
-
 
 
         await joinAndPlay(userVoiceChannel.channelId, message.guild)
@@ -137,12 +136,12 @@ client.on('messageCreate', async (message) => {
 
 })
 
-const joinAndPlay =async (channelId, guild) => {
+const joinAndPlay = async (channelId, guild) => {
 
     const stream = await play.stream("https://www.youtube.com/watch?v=jfKfPfyJRdk&ab_channel=LofiGirl")
 
 
-    connection = joinVoiceChannel({
+    connection[guild.id] = joinVoiceChannel({
         channelId: channelId,
         guildId: guild.id,
         adapterCreator: guild.voiceAdapterCreator,
@@ -157,13 +156,13 @@ const joinAndPlay =async (channelId, guild) => {
 
     player.play(resource)
 
-    connection.subscribe(player)
+    connection[guild.id].subscribe(player)
 
     client.on('messageCreate', async (message) => {
-        if (message.content === prefix+"stop"){
-            if (!connection) return
-            connection.destroy()
-            connection = null
+        if (message.content === prefix + "stop") {
+            if (!connection[message.guild.id]) return
+            connection[message.guild.id].destroy()
+            connection[message.guild.id] = null
             await message.reply("o7");
         }
 
@@ -171,9 +170,9 @@ const joinAndPlay =async (channelId, guild) => {
 
     client.on('interactionCreate', async interaction => {
         if (interaction.commandName === 'stop') {
-            if (!connection) return
-            connection.destroy()
-            connection = null
+            if (!connection[interaction.guild.id]) return
+            connection[interaction.guild.id].destroy()
+            connection[interaction.guild.id] = null
             await interaction.reply("o7");
 
         }
@@ -181,8 +180,6 @@ const joinAndPlay =async (channelId, guild) => {
     })
 
 }
-
-
 
 
 // Login to Discord with your client's token
